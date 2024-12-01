@@ -13,6 +13,7 @@ class Channel(BaseModel):
         db_table = 'channels'
 
     url = CharField(unique=True)
+    name = CharField(unique=True)
 
 
 class Video(BaseModel):
