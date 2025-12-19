@@ -2,3 +2,5 @@ TikTok.db
 .venv
 env
 .env
+__pycache__/
+

@@ -1,4 +1,6 @@
-from peewee import CharField, IntegerField, Model, SqliteDatabase, ForeignKeyField
+import datetime
+
+from peewee import CharField, Model, SqliteDatabase, ForeignKeyField, DateTimeField
 
 db = SqliteDatabase('TikTok.db')
 
@@ -22,6 +24,7 @@ class Video(BaseModel):
 
     channel = ForeignKeyField(Channel, backref='videos')
     url = CharField(unique=True)
+    parsed_time = DateTimeField(default=datetime.datetime.now())
 
 
 def register_models() -> None:
