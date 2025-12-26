@@ -13,17 +13,7 @@ async def get_last_channel_videos(username: str, max_links_quantity: int) -> lis
         print(f"Initiating scrape for TikTok profile: @{username}")
         try:
             browser = await uc.start(
-                headless=False,
-                no_sandbox=True,
-                browser_executable_path="/usr/bin/chromium",
-                args=[
-                    "--disable-dev-shm-usage",
-                    "--disable-gpu",
-                    "--no-first-run",
-                    "--no-default-browser-check",
-                ],
-                # если есть параметр для аргументов — добавь
-                # browser_args=["--disable-dev-shm-usage"]
+                headless=False
             )
             print("Browser started successfully")
         except Exception as e:
