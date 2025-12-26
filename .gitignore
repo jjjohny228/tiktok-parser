@@ -3,4 +3,4 @@ TikTok.db
 env
 .env
 __pycache__/
-
+.idea
