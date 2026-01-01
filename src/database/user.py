@@ -1,4 +1,4 @@
-from .models import Channel, Video
+from .models import Channel, Video, Target
 
 
 def get_tiktok_username(url):
@@ -26,6 +26,16 @@ def create_video_if_not_exist(video_url: str, channel_name: str):
     if not get_video_by_url_or_none(video_url):
         channel = Channel.get(Channel.name == channel_name)
         Video.create(url=video_url, channel=channel)
+
+
+def create_target_if_not_exist(source_channel_url: str, source_channel_name: str, target_channel_url: str, channel_apostol_id: str):
+    target = Target.get_or_none(Target.target_channel_url==target_channel_url)
+    source_channel = Channel.get_or_create(url=source_channel_url, name=source_channel_name)
+    if not target:
+        Target.create(source_channel=source_channel,
+                      target_channel_url=target_channel_url,
+                      channel_apostol_id=channel_apostol_id)
+
 
 
 def get_channels_names() -> list:

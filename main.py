@@ -1,6 +1,5 @@
 import nodriver as uc
-import time
-from src.functions import search_channels, add_channel
+from src.content_functions.parser import search_channels, add_channel
 from src.database.models import register_models
 
 

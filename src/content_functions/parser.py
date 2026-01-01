@@ -1,11 +1,9 @@
 import asyncio
-import requests
 from bs4 import BeautifulSoup
 import nodriver as uc
 
 
-from src.database.user import get_video_by_url_or_none, get_channels_names, create_channel_if_not_exist, \
-    create_video_if_not_exist
+from src.database.user import get_channels_names, create_channel_if_not_exist, create_video_if_not_exist
 
 
 async def get_last_channel_videos(username: str, max_links_quantity: int) -> list:
@@ -67,6 +65,3 @@ async def search_channels():
         for video in new_channel_videos:
             create_video_if_not_exist(video, channel)
 
-
-def add_channel(url):
-    create_channel_if_not_exist(url)

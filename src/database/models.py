@@ -27,6 +27,15 @@ class Video(BaseModel):
     parsed_time = DateTimeField(default=datetime.datetime.now())
 
 
+class Target(BaseModel):
+    class Meta:
+        db_table = 'targets'
+
+    source_channel = ForeignKeyField(Channel, backref='targets')
+    target_channel_url = CharField(unique=True)
+    channel_apostol_id = CharField(unique=True)
+
+
 def register_models() -> None:
     for model in BaseModel.__subclasses__():
         model.create_table()
