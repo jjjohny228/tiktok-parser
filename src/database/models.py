@@ -1,16 +1,33 @@
 import datetime
 
-from peewee import CharField, Model, SqliteDatabase, ForeignKeyField, DateTimeField
+from peewee import CharField, Model, SqliteDatabase, ForeignKeyField, DateTimeField, BigIntegerField, BooleanField
 
 db = SqliteDatabase('TikTok.db')
 
 
-class BaseModel(Model):
+class _BaseModel(Model):
     class Meta:
         database = db
 
 
-class Channel(BaseModel):
+class User(_BaseModel):
+    """
+    The model contains users information.
+    """
+    class Meta:
+        db_table = 'users'
+
+    username = CharField(default='Пользователь')
+    first_name = CharField(null=True)
+    last_name = CharField(null=True)
+    telegram_id = BigIntegerField(unique=True, null=False)
+    registration_timestamp = DateTimeField(default=datetime.datetime.now())
+
+
+class Channel(_BaseModel):
+    """
+    Contains info about TikTok channels
+    """
     class Meta:
         db_table = 'channels'
 
@@ -18,7 +35,10 @@ class Channel(BaseModel):
     name = CharField(unique=True)
 
 
-class Video(BaseModel):
+class Video(_BaseModel):
+    """
+    Contains info about TikTok videos
+    """
     class Meta:
         db_table = 'videos'
 
@@ -27,15 +47,19 @@ class Video(BaseModel):
     parsed_time = DateTimeField(default=datetime.datetime.now())
 
 
-class Target(BaseModel):
+class Target(_BaseModel):
+    """
+    Contains info about TikTok source channels and YouTube channel apostol id where parsed videos will be posted
+    """
     class Meta:
         db_table = 'targets'
 
-    source_channel = ForeignKeyField(Channel, backref='targets')
+    source_channel = ForeignKeyField(Channel, backref='targets', on_delete='CASCADE')
     target_channel_url = CharField(unique=True)
     channel_apostol_id = CharField(unique=True)
+    last_video_published_time = DateTimeField(null=True)
 
 
 def register_models() -> None:
-    for model in BaseModel.__subclasses__():
+    for model in _BaseModel.__subclasses__():
         model.create_table()

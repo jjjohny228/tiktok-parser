@@ -36,25 +36,24 @@ class Messages:
         )
 
     @staticmethod
-    def get_instruction_video() -> InputFile:
-        return InputFile('resources/mines/instruction.mp4')
+    def get_source_channel_url_text() -> str:
+        return 'Send source channel url'
 
     @staticmethod
-    def get_throttled_error() -> str:
-        return 'Пожалуйста, не так часто 🙏'
+    def get_wrong_channel_url() -> str:
+        return 'You have sent wrong channel url'
 
     @staticmethod
-    def get_add_taget_name_text():
-        return 'Введите название таргета:'
+    def get_add_target_channel_url_text() -> str:
+        return 'Send target channel url'
 
     @staticmethod
-    def get_add_taget_url_text():
-        return 'Введите url таргета  (ссылка должна быть со всеми нужными фильтрами):'
+    def get_target_channel_apostol_id_text() -> str:
+        return 'Send apostol youtube channel id (in apostol app)'
 
     @staticmethod
-    def get_add_taget_chat_id_text():
-        return ('Введите id чата куда будут присылаться результаты (обязательное условие '
-                'чтобы бот был админом группы или же пользователь заранее нажал в боте старт):')
+    def get_add_channel_success_text() -> str:
+        return 'You have successfully added channel'
 
     @staticmethod
     def get_wrond_target_url():
@@ -70,7 +69,7 @@ class Messages:
 
     @staticmethod
     def get_welcome_text():
-        return 'Добро пожаловать в бот по поиску обьявлений'
+        return 'Welcome to the tiktok bot'
 
     @staticmethod
     def get_targets_menu_text():
@@ -79,4 +78,11 @@ class Messages:
     @staticmethod
     def get_target_success_text():
         return 'Таргет был успешно добавлен'
+
+    @staticmethod
+    def get_all_targets_text(targets: list) -> str:
+        result = ''
+        for target in targets:
+            result += f'{target.id}\n{target.source_channel.url}\n{target.target_channel_url}\n\n'
+        return result
 

@@ -1,27 +1,18 @@
-import asyncio
-import re
-
-from aiogram import Bot
 from aiogram import Dispatcher
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import CommandStart
-from aiogram.types import CallbackQuery, Message, Chat
-from aiogram.utils import exceptions
-from aiogram.utils.exceptions import ChatNotFound, BotBlocked
+from aiogram.types import CallbackQuery, Message
 
-from src.database.user import create_user_if_not_exist, create_target, get_user_targets
+from src.database.user import create_user_if_not_exist, create_channel_if_not_exist, \
+    create_target_if_not_exist, create_video_if_not_exist, get_all_targets, get_target_by_id, delete_target_by_id
 from src.utils import send_typing_action
-from .kb import Keyboards
-# from src.misc import UserDataInputting
-from .messages import Messages
-from src.filters.filter_func import check_is_admin
-from src.handlers.admin.admin import send_admin_menu
-# from .kb import Keyboards
+from src.handlers.user.kb import Keyboards
 from config import Config
 from src.utils import logger
 from src.create_bot import bot
-from src.misc.user_states import UserTargetInputting
+from src.misc.user_states import UserChannelInputting, DeleteChannelInputting
 from src.handlers.user.messages import Messages
+from src.content_functions.parser import Parser
 
 
 class Utils:
@@ -35,162 +26,144 @@ class Utils:
             logger.error(f'Some error occurred: {e}')
             return False
 
+    @staticmethod
+    async def send_database() -> None:
+        dump_path = Config.DATABASE_PATH
+        for admin_id in {*Config.ADMIN_IDS}:
+            with open(dump_path, 'rb') as database_file:
+                await bot.send_document(admin_id, database_file)
+
+
+
 
 class Handlers:
     @staticmethod
-    async def __handle_add_target_button(message: Message, state: FSMContext):
-        await message.answer(Messages.get_add_taget_name_text(), reply_markup=Keyboards.get_cancel_target_markup())
-        await state.set_state(UserTargetInputting.target_name)
+    async def __handle_add_channel_button(callback: CallbackQuery, state: FSMContext):
+        await callback.message.answer(text=Messages.get_source_channel_url_text(),
+                             reply_markup=Keyboards.get_cancel_adding_channel_markup())
+        await state.set_state(UserChannelInputting.source_channel_url)
 
     @staticmethod
-    async def __handle_taget_name(message: Message, state: FSMContext):
-        await state.update_data(target_name=message.text)
-        await message.answer(Messages.get_add_taget_url_text())
-        await state.set_state(UserTargetInputting.target_url)
+    async def __handle_source_channel_url(message: Message, state: FSMContext):
+        if not message.text.startswith("https://"):
+            await message.answer(Messages.get_wrong_channel_url())
+        else:
+            await state.update_data(source_channel_url=message.text.split("?")[0])
+            await message.answer(Messages.get_add_target_channel_url_text())
+            await state.set_state(UserChannelInputting.target_channel_url)
 
     @staticmethod
-    async def __handle_taget_url(message: Message, state: FSMContext):
+    async def __handle_target_channel_url(message: Message, state: FSMContext):
         if not message.text.startswith("https://"):
             await message.answer(Messages.get_wrond_target_url())
         else:
-            await state.update_data(target_url=message.text)
-            await message.answer(Messages.get_add_taget_chat_id_text())
-            await state.set_state(UserTargetInputting.target_chat_id)
+            await state.update_data(target_channel_url=message.text)
+            await message.answer(Messages.get_target_channel_apostol_id_text())
+            await state.set_state(UserChannelInputting.target_channel_apostol_id)
 
     @staticmethod
-    async def __handle_chat_id(message: Message, state: FSMContext):
-        if not await Utils.is_valid_chat_id(message.text):
-            await message.answer(Messages.get_wrond_target_chat_id_text())
-        else:
-            await state.update_data(chat_id=message.text)
+    async def __handle_target_channel_apostol_id(message: Message, state: FSMContext):
+        await state.update_data(target_channel_apostol_id=message.text)
 
-            # Save target
-            data = await state.get_data()
-            target_name = data.get("target_name")
-            target_url = data.get("target_url")
-            chat_id = data.get("chat_id")
+        # Save channel and target
+        data = await state.get_data()
+        source_channel_url = data.get("source_channel_url")
+        target_channel_url = data.get("target_channel_url")
+        target_channel_apostol_id = data.get("target_channel_apostol_id")
 
-            create_target(message.from_user.id, target_name, target_url, chat_id)
-            await message.answer(Messages.get_target_success_text(), reply_markup=Keyboards.get_targets_menu())
-            await state.finish()
+        create_channel_if_not_exist(source_channel_url)
+        new_target = create_target_if_not_exist(source_channel_url, target_channel_url, target_channel_apostol_id)
+        if new_target:
+            last_channel_videos = await Parser().get_last_channel_videos(new_target.source_channel.name)
+            for last_channel_video in last_channel_videos:
+                create_video_if_not_exist(last_channel_video, new_target.source_channel)
+        await message.answer(Messages.get_add_channel_success_text(), reply_markup=Keyboards.get_menu_markup())
+        await state.finish()
 
     @staticmethod
-    async def __handle_cancel_adding_target(message: Message, state: FSMContext):
-        await message.answer(Messages.get_cancel_adding_target_text(), reply_markup=Keyboards.get_targets_menu())
+    async def __handle_cancel_adding_channel(message: Message, state: FSMContext):
+        await message.answer(Messages.get_cancel_adding_target_text(), reply_markup=Keyboards.get_menu_markup())
         await state.finish()
 
     @staticmethod
     async def __handle_main_menu(message: Message):
-        await message.answer('🏠', reply_markup=Keyboards.get_main_menu_markup(message))
+        await message.answer('🏠', reply_markup=Keyboards.get_menu_markup())
 
     @staticmethod
-    async def __handle_my_targets(message: Message):
-        if get_user_targets(message.from_user.id):
-            await message.answer(text='Чтобы редактировать таргет нажмите на один из них',
-                                 reply_markup=Keyboards.get_my_targets_markup(message.from_user.id))
+    async def __handle_channel_menu(message: Message):
+        targets = get_all_targets()
+        print(targets)
+        if targets:
+            await message.answer(text=Messages.get_all_targets_text(targets),
+                                 disable_web_page_preview=True,
+                                 reply_markup=Keyboards.get_channels_markup(has_channels=True))
         else:
-            await message.answer('У вас нет тергетов')
+            await message.answer(text='You dont have any targets',
+                                 disable_web_page_preview=True,
+                                 reply_markup=Keyboards.get_channels_markup(has_channels=False))
 
     @staticmethod
-    async def __handle_targets_menu_callback(callback: CallbackQuery):
+    async def __handle_delete_target(callback: CallbackQuery, state: FSMContext):
+        await callback.message.answer('Send channel id to delete it',
+                                      reply_markup=Keyboards.get_cancel_adding_channel_markup())
+        await state.set_state(DeleteChannelInputting.channel_id)
         await callback.answer()
-        await callback.message.delete()
-        await callback.message.answer('Меню таргетов', reply_markup=Keyboards.get_targets_menu())
+
+    @staticmethod
+    async def __handle_delete_target_id(message: Message, state: FSMContext):
+        if not message.text.isdigit():
+            await message.answer('You should enter a number')
+            return
+        target = get_target_by_id(message.text)
+        if not target:
+            await message.answer('You entered invalid target id')
+            return
+        delete_target_by_id(target.id)
+        await message.answer(f'Target with id {target.id} was deleted successfully',
+                             reply_markup=Keyboards.get_menu_markup())
+        await state.finish()
 
     @staticmethod
     async def __handle_start_command(message: Message, state: FSMContext) -> None:
         await state.finish()
-        if check_is_admin(message):
-            await send_admin_menu(message)
-        else:
-            await send_typing_action(message)
+        await send_typing_action(message)
 
-            create_user_if_not_exist(
-                username=message.from_user.username,
-                first_name=message.from_user.first_name,
-                last_name=message.from_user.first_name,
-                telegram_id=message.from_id,
+        create_user_if_not_exist(
+            username=message.from_user.username,
+            first_name=message.from_user.first_name,
+            last_name=message.from_user.first_name,
+            telegram_id=message.from_id,
+        )
+
+        await message.answer(
+            text=Messages.get_welcome_text(),
+            reply_markup=Keyboards.get_menu_markup()
             )
-
-            await message.answer(
-                text=Messages.get_welcome_text(),
-                reply_markup=Keyboards.get_main_menu_markup(message)
-            )
-    @staticmethod
-    async def __handle_tagets_menu(message: Message):
-        await message.answer(text=Messages.get_targets_menu_text(),
-                             reply_markup=Keyboards.get_targets_menu())
-
-    @staticmethod
-    async def __change_target_page(callback_query: CallbackQuery):
-        page = int(callback_query.data.split("_")[1])
-        await callback_query.message.edit_reply_markup(
-            reply_markup=Keyboards.get_my_targets_markup(callback_query.from_user.id, page))
-        await callback_query.answer()
 
 
     @classmethod
     def register_user_handlers(cls, dp: Dispatcher) -> None:
         dp.register_message_handler(cls.__handle_start_command, CommandStart(), state=None)
-        dp.register_message_handler(cls.__handle_cancel_adding_target, state='*', text='Отменить добавление таргета')
-        dp.register_message_handler(cls.__handle_add_target_button, text='Добавить таргет ➕', state=None)
-        dp.register_message_handler(cls.__handle_taget_name, state=UserTargetInputting.target_name)
-        dp.register_message_handler(cls.__handle_taget_url, state=UserTargetInputting.target_url)
-        dp.register_message_handler(cls.__handle_chat_id, state=UserTargetInputting.target_chat_id)
-        dp.register_message_handler(cls.__handle_tagets_menu, text='Таргеты 🚀')
-        dp.register_message_handler(cls.__handle_main_menu, text='Назад в главное меню  ⬅️')
-        dp.register_callback_query_handler(cls.__change_target_page, lambda c: c.data.startswith("page_") and c.data.endswith("target"))
-        dp.register_callback_query_handler(cls.__handle_targets_menu_callback,
-                                           lambda c: c.data == 'my_targets_menu')
-        dp.register_message_handler(cls.__handle_my_targets, text='Мои таргеты')
-        # dp.register_callback_query_handler(__handle_next_signal_callback, text='mines_next_signal')
-        # dp.register_callback_query_handler(__handle_menu_callback, text='mines_menu')
-        # dp.register_callback_query_handler(__handle_instruction_callback, text='mines_instruction_menu')
+        dp.register_message_handler(cls.__handle_cancel_adding_channel, state='*', text='Cancel')
+        dp.register_callback_query_handler(cls.__handle_add_channel_button,
+                                    lambda c: c.data == 'add_channel',
+                                    state=None)
+        dp.register_message_handler(cls.__handle_source_channel_url,
+                                           state=UserChannelInputting.source_channel_url)
+        dp.register_message_handler(cls.__handle_target_channel_url,
+                                    state=UserChannelInputting.target_channel_url)
+        dp.register_message_handler(cls.__handle_target_channel_apostol_id,
+                                    state=UserChannelInputting.target_channel_apostol_id)
+        dp.register_message_handler(cls.__handle_channel_menu,
+                                    text='Channels')
+        dp.register_callback_query_handler(cls.__handle_delete_target,
+                                           lambda c: c.data == 'delete_channel',
+                                           state=None)
+        dp.register_message_handler(cls.__handle_delete_target_id,
+                                           state=DeleteChannelInputting.channel_id)
+
 
 
 def register_user_handlers(dp: Dispatcher):
     Handlers.register_user_handlers(dp)
-# async def __handle_next_signal_callback(callback: CallbackQuery):
-#     # Удаляем сообщение
-#     menu_owner = callback.data.split('_')[0]
-#     await callback.answer(text=MinesMessages.get_loading())
-#     await callback.message.delete()
-#     msg = await callback.message.answer('⌛️ Waiting...')
-#     delay_seconds = random.uniform(2, 3)
-#
-#     await asyncio.sleep(delay_seconds)
-#     await msg.delete()
-#
-#     if get_user_1win_id(callback.message.chat.id):
-#         new_photo = MinesMessages.get_random_signal()
-#
-#         await callback.message.answer_photo(photo=new_photo,
-#                                             caption=MinesMessages.get_signal_text(),
-#                                             reply_markup=MinesKeyboards.get_signal_markup())
-#     else:
-#         await callback.message.answer_photo(
-#             caption=CommonMessages.get_registration_text(callback.message.chat.first_name),
-#             photo=CommonMessages.get_registration_explanation_photo(),
-#             reply_markup=CommonKeyboards.get_registration_menu(menu_owner)
-#         )
-#     await callback.answer()
-#
-#
-# async def __handle_menu_callback(callback: CallbackQuery):
-#     await callback.message.delete()
-#     await callback.message.answer_photo(photo=MinesMessages.get_menu_photo(),
-#                                         caption=MinesMessages.get_menu_text(),
-#                                         reply_markup=MinesKeyboards.get_menu_markup())
-#     await callback.answer()
-#
-#
-# async def __handle_instruction_callback(callback: CallbackQuery):
-#     menu_owner = callback.data.split('_')[0]
-#     await callback.message.delete()
-#
-#     await callback.message.answer_video(
-#         video=MinesMessages.get_instruction_video(),
-#         caption=MinesMessages.get_instruction_text(),
-#         reply_markup=CommonKeyboards.get_instruction_menu(menu_owner)
-#     )
 

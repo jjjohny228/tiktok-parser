@@ -2,66 +2,74 @@ import asyncio
 from bs4 import BeautifulSoup
 import nodriver as uc
 
+from config import Config
+from src.database.user import get_channel_names, create_video_if_not_exist
+from src.utils import logger
 
-from src.database.user import get_channels_names, create_channel_if_not_exist, create_video_if_not_exist
 
+class Parser:
+    """
+    Class to parse new videos in TikTok
+    """
+    MAX_LINKS_PER_CHANNEL = Config.MAX_LINKS_PER_CHANNEL
 
-async def get_last_channel_videos(username: str, max_links_quantity: int) -> list:
-    try:
-        print(f"Initiating scrape for TikTok profile: @{username}")
+    async def search_videos(self):
+        """
+        Gets all channels from database and check do they have new videos
+        """
+        channels = [channel.name for channel in get_channel_names()]
+        if not channels:
+            logger.info('You dont have any channels')
+        print("Каналы", channels)
+        for channel in channels:
+            new_channel_videos = await self.get_last_channel_videos(channel)
+
+            for video in new_channel_videos:
+                create_video_if_not_exist(video, channel)
+
+    async def get_last_channel_videos(self, username: str) -> list:
+        """
+        Returns last channel videos
+        """
         try:
-            browser = await uc.start(
-                headless=False
-            )
-            print("Browser started successfully")
+            logger.info(f"Initiating scrape for TikTok profile: @{username}")
+            try:
+                browser = await uc.start(
+                    headless=False
+                )
+                logger.success("Browser started successfully")
+            except Exception as e:
+                import traceback
+                logger.error("Failed to start browser:", e)
+                traceback.print_exc()
+                return None
+            logger.success("Browser started successfully")
+
+            page = await browser.get(f"https://www.tiktok.com/@{username}")
+            logger.success("TikTok profile page loaded successfully")
+
+            await asyncio.sleep(10)  # Wait for 10 seconds
+
+            html_content = await page.evaluate('document.documentElement.outerHTML')
+
+            soup = BeautifulSoup(html_content, 'html.parser')
+
+            new_videos = soup.find_all('div', {'data-e2e': 'user-post-item'})[:self.MAX_LINKS_PER_CHANNEL]
+            if not new_videos:
+                logger.info(f"Skip channel {username}: no videos scraped")
+                return []
+
+            video_links = []
+            for video in new_videos:
+                video_url = video.find('a').get('href')
+                video_links.append(video_url)
+                logger.info(f"Found {video_url}")
+            return video_links
         except Exception as e:
-            import traceback
-            print("Failed to start browser:", e)
-            traceback.print_exc()
-            return None
-        print("Browser started successfully")
-
-        page = await browser.get(f"https://www.tiktok.com/@{username}")
-        print("TikTok profile page loaded successfully")
-
-        await asyncio.sleep(10)  # Wait for 10 seconds
-        print("Waited for 10 seconds to allow content to load")
-
-        html_content = await page.evaluate('document.documentElement.outerHTML')
-        print(f"HTML content retrieved (length: {len(html_content)} characters)")
-
-        soup = BeautifulSoup(html_content, 'html.parser')
-        print("HTML content parsed with BeautifulSoup")
-
-        new_videos = soup.find_all('div', {'data-e2e': 'user-post-item'})[:max_links_quantity]
-        if not new_videos:
-            print(f"Skip channel {username}: no videos scraped")
-            return
-
-        video_links = []
-        for video in new_videos:
-            video_url = video.find('a').get('href')
-            video_links.append(video_url)
-            print(f"Found {video_url}")
-        return video_links
-    except Exception as e:
-        print(f"An error occurred while scraping: {str(e)}")
-        return None
-    finally:
-        if 'browser' in locals():
-            browser.stop()
-        print("Browser closed")
-
-
-async def search_channels():
-    channels = [channel.name for channel in get_channels_names()]
-    print(channels)
-    if not channels:
-        print('You dont have any channels')
-    print("Каналы", channels)
-    for channel in channels:
-        new_channel_videos = await get_last_channel_videos(channel, 10)
-
-        for video in new_channel_videos:
-            create_video_if_not_exist(video, channel)
+            logger.error(f"An error occurred while scraping: {str(e)}")
+            return []
+        finally:
+            if 'browser' in locals():
+                browser.stop()
+            logger.info("Browser closed")
 

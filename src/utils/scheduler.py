@@ -1,6 +1,8 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-def schedule_func(func):
-    scheduler = AsyncIOScheduler()
-    scheduler.add_job(func=func, trigger="interval", minutes=5)
-    scheduler.start()
+
+scheduler = AsyncIOScheduler()
+
+
+def schedule_func(func, **job_kwargs):
+    scheduler.add_job(func=func, **job_kwargs)

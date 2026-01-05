@@ -1,4 +1,4 @@
-from .models import Channel, Video, Target
+from .models import Channel, Video, Target, User
 
 
 def get_tiktok_username(url):
@@ -22,21 +22,52 @@ def create_channel_if_not_exist(channel_url: str) -> bool:
     return False
 
 
-def create_video_if_not_exist(video_url: str, channel_name: str):
+def create_video_if_not_exist(video_url: str, channel_id: int):
     if not get_video_by_url_or_none(video_url):
-        channel = Channel.get(Channel.name == channel_name)
+        channel = Channel.get(Channel.id == channel_id)
         Video.create(url=video_url, channel=channel)
 
 
-def create_target_if_not_exist(source_channel_url: str, source_channel_name: str, target_channel_url: str, channel_apostol_id: str):
-    target = Target.get_or_none(Target.target_channel_url==target_channel_url)
-    source_channel = Channel.get_or_create(url=source_channel_url, name=source_channel_name)
+def create_target_if_not_exist(source_channel_url: str, target_channel_url: str, channel_apostol_id: str) -> Target | None:
+    source_channel = Channel.get(url=source_channel_url)
+    target = Target.get_or_none(Target.target_channel_url==target_channel_url, Target.source_channel==source_channel)
     if not target:
-        Target.create(source_channel=source_channel,
+        new_target = Target.create(source_channel=source_channel,
                       target_channel_url=target_channel_url,
                       channel_apostol_id=channel_apostol_id)
+        return new_target
 
 
 
-def get_channels_names() -> list:
+def get_channel_names() -> list:
     return Channel.select(Channel.name)
+
+
+def create_user_if_not_exist(username: str, first_name: str, last_name: str, telegram_id: int) -> bool:
+    if not get_user_by_telegram_id_or_none(telegram_id):
+        User.create(username=username, first_name=first_name, last_name=last_name, telegram_id=telegram_id)
+        return True
+    return False
+
+
+def get_user_by_telegram_id_or_none(telegram_id: int) -> None:
+    return User.get_or_none(User.telegram_id == telegram_id)
+
+
+def get_all_targets():
+    return (
+        Target
+        .select(Target.id, Target.target_channel_url, Channel.url)
+        .join(Channel)
+    )
+
+
+def get_target_by_id(target_id: str) -> Target | None:
+    return Target.get_or_none(Target.id == int(target_id))
+
+
+def delete_target_by_id(target_id: int) -> None:
+    target_id = int(target_id)
+    Target.delete().where(Target.id==target_id).execute()
+
+

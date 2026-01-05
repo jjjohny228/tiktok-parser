@@ -16,5 +16,7 @@ class Config:
     POSTIZ_UPLOAD_FILE_URL = os.getenv('POSTIZ_UPLOAD_FILE_URL')
     POSTIZ_POST_VIDEOS_URL = os.getenv('POSTIZ_POST_VIDEOS_URL')
     RAPIDAPI_KEY = os.getenv('RAPIDAPI_KEY')
+    DATABASE_PATH = os.getenv('DATABASE_PATH')
+    MAX_LINKS_PER_CHANNEL = 10
 
     DEBUG: Final = bool(os.getenv('DEBUG'))
