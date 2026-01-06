@@ -36,7 +36,7 @@ class Parser:
                     # Check if last published video time was more than 2 hours ago
                     if not target.last_video_published_time or datetime.now() - target.last_video_published_time >= timedelta(hours=2):
                         post_video_from_source_channel(video, target.channel_apostol_id, target.platform)
-                        await Utils.send_posted_video_message(channel.url)
+                        await Utils.send_posted_video_message(target.target_channel_url)
                         update_last_video_published_time(datetime.now(), target.id)
                         logger.success(f'New video added to channel {channel.name}')
 

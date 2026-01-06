@@ -2,7 +2,7 @@ import datetime
 
 from peewee import CharField, Model, SqliteDatabase, ForeignKeyField, DateTimeField, BigIntegerField, BooleanField
 
-db = SqliteDatabase('TikTok.db')
+db = SqliteDatabase('data/TikTok.db')
 
 
 class _BaseModel(Model):
