@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from .models import Channel, Video, Target, User
 
 
@@ -22,10 +24,11 @@ def create_channel_if_not_exist(channel_url: str) -> bool:
     return False
 
 
-def create_video_if_not_exist(video_url: str, channel_id: int):
+def create_video_if_not_exist(video_url: str, channel: Channel) -> bool:
     if not get_video_by_url_or_none(video_url):
-        channel = Channel.get(Channel.id == channel_id)
         Video.create(url=video_url, channel=channel)
+        return True
+    return False
 
 
 def create_target_if_not_exist(source_channel_url: str, target_channel_url: str, channel_apostol_id: str) -> Target | None:
@@ -39,8 +42,8 @@ def create_target_if_not_exist(source_channel_url: str, target_channel_url: str,
 
 
 
-def get_channel_names() -> list:
-    return Channel.select(Channel.name)
+def get_all_channels() -> list:
+    return Channel.select()
 
 
 def create_user_if_not_exist(username: str, first_name: str, last_name: str, telegram_id: int) -> bool:
@@ -66,8 +69,17 @@ def get_target_by_id(target_id: str) -> Target | None:
     return Target.get_or_none(Target.id == int(target_id))
 
 
+def get_target_by_channel(channel: Channel) -> Target | None:
+    return Target.get(Target.source_channel == channel)
+
+
 def delete_target_by_id(target_id: int) -> None:
     target_id = int(target_id)
     Target.delete().where(Target.id==target_id).execute()
+
+
+def update_last_video_published_time(new_time: datetime, target_id: int) -> None:
+    Target.update(last_video_published_time=new_time).where(Target.id==target_id).execute()
+
 
 

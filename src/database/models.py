@@ -32,7 +32,7 @@ class Channel(_BaseModel):
         db_table = 'channels'
 
     url = CharField(unique=True)
-    name = CharField(unique=True)
+    name = CharField()
 
 
 class Video(_BaseModel):
@@ -57,6 +57,7 @@ class Target(_BaseModel):
     source_channel = ForeignKeyField(Channel, backref='targets', on_delete='CASCADE')
     target_channel_url = CharField(unique=True)
     channel_apostol_id = CharField(unique=True)
+    platform = CharField(default='youtube')
     last_video_published_time = DateTimeField(null=True)
 
 

@@ -1,9 +1,13 @@
 import asyncio
+from datetime import datetime, timedelta
+
 from bs4 import BeautifulSoup
 import nodriver as uc
 
 from config import Config
-from src.database.user import get_channel_names, create_video_if_not_exist
+from src.content_functions.editor import post_video_from_source_channel
+from src.database.user import create_video_if_not_exist, get_all_channels, get_target_by_channel, \
+    update_last_video_published_time
 from src.utils import logger
 
 
@@ -17,15 +21,24 @@ class Parser:
         """
         Gets all channels from database and check do they have new videos
         """
-        channels = [channel.name for channel in get_channel_names()]
+        from src.handlers.user.user import Utils
+
+        channels = get_all_channels()
         if not channels:
             logger.info('You dont have any channels')
-        print("Каналы", channels)
-        for channel in channels:
-            new_channel_videos = await self.get_last_channel_videos(channel)
 
+        for channel in channels:
+            new_channel_videos = await self.get_last_channel_videos(channel.name)
             for video in new_channel_videos:
-                create_video_if_not_exist(video, channel)
+                is_new_video = create_video_if_not_exist(video, channel)
+                if is_new_video:
+                    target = get_target_by_channel(channel)
+                    # Check if last published video time was more than 2 hours ago
+                    if not target.last_video_published_time or datetime.now() - target.last_video_published_time >= timedelta(hours=2):
+                        post_video_from_source_channel(video, target.channel_apostol_id, target.platform)
+                        await Utils.send_posted_video_message(channel.url)
+                        update_last_video_published_time(datetime.now(), target.id)
+                        logger.success(f'New video added to channel {channel.name}')
 
     async def get_last_channel_videos(self, username: str) -> list:
         """

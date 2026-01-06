@@ -69,11 +69,5 @@ def post_video_from_source_channel(video_url: str, target_channel_id: str, platf
     cutted_video = cut_last_second(video_file, result_folder)
     edited_video_url = upload_video_file(cutted_video)
     ApostolVideoUploader(platform, target_channel_id, video_description, edited_video_url).upload_video()
-    os.remove(video_file)
+    os.remove(cutted_video)
 
-
-if __name__ == '__main__':
-    post_video_from_source_channel('https://www.tiktok.com/@tonito.rt/video/7588585185726319894?is_from_webapp=1&sender_device=pc',
-                                   'cmiycbf580001qb6wfg71hnpg',
-                                   'youtube'
-                                   )

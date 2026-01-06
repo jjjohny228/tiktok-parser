@@ -5,3 +5,6 @@ env
 __pycache__/
 .idea
 logs/
+src/database/__pycache__/
+result/
+source/

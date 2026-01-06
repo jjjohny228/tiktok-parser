@@ -24,7 +24,7 @@ async def on_startup(_):
     schedule_func(Utils().send_database, trigger='cron', hour=15, minute=0)
 
     # Parse new videos every 5 minutes
-    # schedule_func(Parser().search_videos, trigger='interval', minutes=5)
+    schedule_func(Parser().search_videos, trigger='interval', minutes=5)
 
     scheduler.start()
 

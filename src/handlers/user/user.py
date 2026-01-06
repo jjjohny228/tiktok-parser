@@ -33,6 +33,11 @@ class Utils:
             with open(dump_path, 'rb') as database_file:
                 await bot.send_document(admin_id, database_file)
 
+    @staticmethod
+    async def send_posted_video_message(target_channel_url: str) -> None:
+        for admin_id in {*Config.ADMIN_IDS}:
+            await bot.send_message(admin_id, f'Video was posted on channel {target_channel_url}')
+
 
 
 
