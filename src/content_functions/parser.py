@@ -45,21 +45,17 @@ class Parser:
         Returns last channel videos
         """
         try:
-            logger.info(f"Initiating scrape for TikTok profile: @{username}")
             try:
                 browser = await uc.start(
                     headless=False
                 )
-                logger.success("Browser started successfully")
             except Exception as e:
                 import traceback
                 logger.error("Failed to start browser:", e)
                 traceback.print_exc()
                 return None
-            logger.success("Browser started successfully")
 
             page = await browser.get(f"https://www.tiktok.com/@{username}")
-            logger.success("TikTok profile page loaded successfully")
 
             await asyncio.sleep(10)  # Wait for 10 seconds
 
@@ -76,7 +72,6 @@ class Parser:
             for video in new_videos:
                 video_url = video.find('a').get('href')
                 video_links.append(video_url)
-                logger.info(f"Found {video_url}")
             return video_links
         except Exception as e:
             logger.error(f"An error occurred while scraping: {str(e)}")
@@ -84,5 +79,4 @@ class Parser:
         finally:
             if 'browser' in locals():
                 browser.stop()
-            logger.info("Browser closed")
 
