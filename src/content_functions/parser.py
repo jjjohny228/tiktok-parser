@@ -17,6 +17,9 @@ class Parser:
     """
     MAX_LINKS_PER_CHANNEL = Config.MAX_LINKS_PER_CHANNEL
 
+    def __init__(self):
+        self.browser = None
+
     async def search_videos(self):
         """
         Gets all channels from database and check do they have new videos
@@ -26,36 +29,34 @@ class Parser:
         channels = get_all_channels()
         if not channels:
             logger.info('You dont have any channels')
-
-        for channel in channels:
-            new_channel_videos = await self.get_last_channel_videos(channel.name)
-            for video in new_channel_videos:
-                is_new_video = create_video_if_not_exist(video, channel)
-                if is_new_video:
-                    target = get_target_by_channel(channel)
-                    # Check if last published video time was more than 2 hours ago
-                    if not target.last_video_published_time or datetime.now() - target.last_video_published_time >= timedelta(hours=2):
-                        post_video_from_source_channel(video, target.channel_apostol_id, target.platform)
-                        await Utils.send_posted_video_message(target.target_channel_url)
-                        update_last_video_published_time(datetime.now(), target.id)
-                        logger.success(f'New video added to channel {channel.name}')
+        try:
+            self.browser = await uc.start(headless=False)
+            for channel in channels:
+                new_channel_videos = await self.get_last_channel_videos(channel.name)
+                for video in new_channel_videos:
+                    is_new_video = create_video_if_not_exist(video, channel)
+                    if is_new_video:
+                        target = get_target_by_channel(channel)
+                        # Check if last published video time was more than 2 hours ago
+                        if not target.last_video_published_time or datetime.now() - target.last_video_published_time >= timedelta(hours=2):
+                            post_video_from_source_channel(video, target.channel_apostol_id, target.platform)
+                            await Utils.send_posted_video_message(target.target_channel_url)
+                            update_last_video_published_time(datetime.now(), target.id)
+                            logger.success(f'New video added to channel {channel.name}')
+        finally:
+            if self.browser:
+                await self.browser.stop()
 
     async def get_last_channel_videos(self, username: str) -> list:
         """
         Returns last channel videos
         """
         try:
-            try:
-                browser = await uc.start(
-                    headless=False
-                )
-            except Exception as e:
-                import traceback
-                logger.error("Failed to start browser:", e)
-                traceback.print_exc()
-                return None
+            if not self.browser:
+                logger.error("Browser not initialized")
+                return []
 
-            page = await browser.get(f"https://www.tiktok.com/@{username}")
+            page = await self.browser.get(f"https://www.tiktok.com/@{username}")
 
             await asyncio.sleep(10)  # Wait for 10 seconds
 
@@ -76,7 +77,4 @@ class Parser:
         except Exception as e:
             logger.error(f"An error occurred while scraping: {str(e)}")
             return []
-        finally:
-            if 'browser' in locals():
-                browser.stop()
 
