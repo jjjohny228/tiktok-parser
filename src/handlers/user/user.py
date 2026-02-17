@@ -12,7 +12,6 @@ from src.utils import logger
 from src.create_bot import bot
 from src.misc.user_states import UserChannelInputting, DeleteChannelInputting
 from src.handlers.user.messages import Messages
-from src.content_functions.parser import Parser
 
 
 class Utils:
@@ -68,6 +67,8 @@ class Handlers:
 
     @staticmethod
     async def __handle_target_channel_apostol_id(message: Message, state: FSMContext):
+        from src.content_functions.parser import Parser
+
         await state.update_data(target_channel_apostol_id=message.text)
 
         # Save channel and target
