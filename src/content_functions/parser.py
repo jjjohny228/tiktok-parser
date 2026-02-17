@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime, timedelta
 
 from bs4 import BeautifulSoup
-import nodriver as uc
+import zendriver as uc
 
 from config import Config
 from src.content_functions.editor import post_video_from_source_channel
@@ -90,20 +90,13 @@ class Parser:
     async def fetch_channel_videos(self, username: str) -> list[str]:
         """
         Starts browser, fetches last videos for one channel, closes browser.
-        Use this from handlers (e.g. when adding a channel); do not call get_last_channel_videos without a running browser.
         """
         async with _parser_lock:
             try:
                 self.browser = await uc.start(headless=True, sandbox=False)
                 return await self.get_last_channel_videos(username)
-            except TypeError as e:
-                if "cannot unpack non-iterable NoneType" in str(e):
-                    logger.error("Nodriver headless bug when fetching channel videos")
-                else:
-                    logger.exception("Error fetching channel videos")
-                return []
-            except Exception:
-                logger.exception("Error fetching channel videos")
+            except Exception as e :
+                logger.error(f"Error fetching channel videos: {e}")
                 return []
             finally:
                 await self._close_browser()
@@ -130,14 +123,12 @@ class Parser:
         """
         Gets all channels from database and check do they have new videos
         """
-        from src.handlers.user.user import Utils
 
         channels = get_all_channels() or []
         new_videos = []
         if not channels:
             logger.info('You dont have any channels')
         try:
-            # sandbox=False should be in Docker/root; it decreases nodriver bug chances in the headless mode
             self.browser = await uc.start(headless=True)
             for channel in channels:
                 new_channel_videos = await self.get_last_channel_videos(channel.name)
@@ -146,15 +137,6 @@ class Parser:
                     if is_new_video:
                         new_videos.append({'source_channel': channel, 'new_video': is_new_video})
             return new_videos
-        except TypeError as e:
-            if "cannot unpack non-iterable NoneType" in str(e):
-                logger.error(
-                    "Nodriver headless bug: _send_oneshot returned None. "
-                    "Ensure that Chromium is installed and running."
-                )
-            else:
-                logger.exception("Error raised during video parsing")
-            return []
         except Exception:
             logger.exception("Error raised during video parsing")
             return []
