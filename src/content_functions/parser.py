@@ -56,10 +56,16 @@ class Parser:
                 return []
 
             page = await self.browser.get(f"https://www.tiktok.com/@{username}")
+            if page is None:
+                logger.warning(f"Browser returned None for {username}")
+                return []
 
             await asyncio.sleep(10)  # Wait for 10 seconds
 
             html_content = await page.evaluate('document.documentElement.outerHTML')
+            if html_content is None:
+                logger.warning(f"Page evaluate returned None for {username}")
+                return []
 
             soup = BeautifulSoup(html_content, 'html.parser')
 
@@ -70,15 +76,40 @@ class Parser:
 
             video_links = []
             for video in new_videos:
-                video_url = video.find('a').get('href')
-                video_links.append(video_url)
+                link_el = video.find('a')
+                if link_el is None:
+                    continue
+                href = link_el.get('href')
+                if href:
+                    video_links.append(href)
             return video_links
         except Exception as e:
             logger.error(f"An error occurred while scraping: {str(e)}")
             return []
 
+    async def fetch_channel_videos(self, username: str) -> list[str]:
+        """
+        Starts browser, fetches last videos for one channel, closes browser.
+        Use this from handlers (e.g. when adding a channel); do not call get_last_channel_videos without a running browser.
+        """
+        async with _parser_lock:
+            try:
+                self.browser = await uc.start(headless=True, sandbox=False)
+                return await self.get_last_channel_videos(username)
+            except TypeError as e:
+                if "cannot unpack non-iterable NoneType" in str(e):
+                    logger.error("Nodriver headless bug when fetching channel videos")
+                else:
+                    logger.exception("Error fetching channel videos")
+                return []
+            except Exception:
+                logger.exception("Error fetching channel videos")
+                return []
+            finally:
+                await self._close_browser()
+
     async def _close_browser(self) -> None:
-        """Гарантированно закрывает браузер с таймаутом. Вызывать в finally."""
+        """Guaranteed to close the browser with a timeout. Call in finally."""
         browser = self.browser
         self.browser = None
         if browser is None:
@@ -101,11 +132,12 @@ class Parser:
         """
         from src.handlers.user.user import Utils
 
-        channels = get_all_channels()
+        channels = get_all_channels() or []
         new_videos = []
         if not channels:
             logger.info('You dont have any channels')
         try:
+            # sandbox=False should be in Docker/root; it decreases nodriver bug chances in the headless mode
             self.browser = await uc.start(headless=True)
             for channel in channels:
                 new_channel_videos = await self.get_last_channel_videos(channel.name)
@@ -114,8 +146,17 @@ class Parser:
                     if is_new_video:
                         new_videos.append({'source_channel': channel, 'new_video': is_new_video})
             return new_videos
-        except Exception as e:
-            logger.error(f'Error raised during video parsing: {e}')
+        except TypeError as e:
+            if "cannot unpack non-iterable NoneType" in str(e):
+                logger.error(
+                    "Nodriver headless bug: _send_oneshot returned None. "
+                    "Ensure that Chromium is installed and running."
+                )
+            else:
+                logger.exception("Error raised during video parsing")
+            return []
+        except Exception:
+            logger.exception("Error raised during video parsing")
             return []
         finally:
             await self._close_browser()

@@ -80,7 +80,7 @@ class Handlers:
         create_channel_if_not_exist(source_channel_url)
         new_target = create_target_if_not_exist(source_channel_url, target_channel_url, target_channel_apostol_id)
         if new_target:
-            last_channel_videos = await Parser().get_last_channel_videos(new_target.source_channel.name)
+            last_channel_videos = await Parser().fetch_channel_videos(new_target.source_channel.name)
             for last_channel_video in last_channel_videos:
                 create_video_if_not_exist(last_channel_video, new_target.source_channel)
         await message.answer(Messages.get_add_channel_success_text(), reply_markup=Keyboards.get_menu_markup())
