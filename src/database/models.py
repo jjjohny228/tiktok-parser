@@ -21,7 +21,7 @@ class User(_BaseModel):
     first_name = CharField(null=True)
     last_name = CharField(null=True)
     telegram_id = BigIntegerField(unique=True, null=False)
-    registration_timestamp = DateTimeField(default=datetime.datetime.now())
+    registration_timestamp = DateTimeField(default=datetime.datetime.now)
 
 
 class Channel(_BaseModel):
