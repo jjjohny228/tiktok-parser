@@ -24,11 +24,11 @@ def create_channel_if_not_exist(channel_url: str) -> bool:
     return False
 
 
-def create_video_if_not_exist(video_url: str, channel: Channel) -> bool:
+def create_video_if_not_exist(video_url: str, channel: Channel) -> Video | None:
     if not get_video_by_url_or_none(video_url):
-        Video.create(url=video_url, channel=channel)
-        return True
-    return False
+        video = Video.create(url=video_url, channel=channel)
+        return video
+    return None
 
 
 def create_target_if_not_exist(source_channel_url: str, target_channel_url: str, channel_apostol_id: str) -> Target | None:
@@ -74,8 +74,12 @@ def get_target_by_channel(channel: Channel) -> Target | None:
 
 
 def delete_target_by_id(target_id: int) -> None:
-    target_id = int(target_id)
-    Target.delete().where(Target.id==target_id).execute()
+    """Deleted target, source channel and all videos that were parsed from this channel"""
+    target = Target.get_or_none(Target.id == target_id)
+    if not target:
+        return
+
+    target.source_channel.delete_instance()
 
 
 def update_last_video_published_time(new_time: datetime, target_id: int) -> None:

@@ -1,11 +1,13 @@
 import asyncio
 from datetime import datetime, timedelta
+from typing import Union
 
 from bs4 import BeautifulSoup
 import zendriver as uc
 
 from config import Config
 from src.content_functions.editor import post_video_from_source_channel
+from src.database.models import Video, Channel
 from src.database.user import create_video_if_not_exist, get_all_channels, get_target_by_channel, \
     update_last_video_published_time
 from src.handlers.user.user import Utils
@@ -34,6 +36,7 @@ class Parser:
         """
         async with _parser_lock:
             new_videos = await self._search_videos()
+            print(new_videos)
         for video in new_videos:
             source_channel = video.get('source_channel')
             video_object = video.get('new_video')
@@ -41,7 +44,7 @@ class Parser:
             # Check if last published video time was more than 1 hours ago
             if not target.last_video_published_time or datetime.now() - target.last_video_published_time >= timedelta(
                     hours=1):
-                post_video_from_source_channel(video_object, target.channel_apostol_id, target.platform)
+                post_video_from_source_channel(video_object.url, target.channel_apostol_id, target.platform)
                 await Utils.send_posted_video_message(target.target_channel_url)
                 update_last_video_published_time(datetime.now(), target.id)
                 logger.success(f'New video added to channel {source_channel.name}')
@@ -119,7 +122,7 @@ class Parser:
         except Exception as e:
             logger.error(f"Failed to stop browser: {e}")
 
-    async def _search_videos(self) -> list[dict[str, str]]:
+    async def _search_videos(self) -> list[dict[str, Union[Channel, Video]]]:
         """
         Gets all channels from database and check do they have new videos
         """
@@ -133,9 +136,9 @@ class Parser:
             for channel in channels:
                 new_channel_videos = await self.get_last_channel_videos(channel.name)
                 for video in new_channel_videos:
-                    is_new_video = create_video_if_not_exist(video, channel)
-                    if is_new_video:
-                        new_videos.append({'source_channel': channel, 'new_video': is_new_video})
+                    new_video = create_video_if_not_exist(video, channel)
+                    if new_video:
+                        new_videos.append({'source_channel': channel, 'new_video': new_video})
             return new_videos
         except Exception:
             logger.exception("Error raised during video parsing")

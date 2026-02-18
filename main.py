@@ -1,4 +1,3 @@
-from src.content_functions.parser import Parser
 from src.start_bot import start_bot
 from src.utils import setup_logger
 

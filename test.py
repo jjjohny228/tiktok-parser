@@ -1,7 +1,5 @@
-import asyncio
-
 from src.content_functions.parser import Parser
-import nodriver as uc
+import zendriver as uc
 
 if __name__ == '__main__':
     parser = Parser()

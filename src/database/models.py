@@ -42,7 +42,7 @@ class Video(_BaseModel):
     class Meta:
         db_table = 'videos'
 
-    channel = ForeignKeyField(Channel, backref='videos')
+    channel = ForeignKeyField(Channel, backref='videos', on_delete='CASCADE')
     url = CharField(unique=True)
     parsed_time = DateTimeField(default=datetime.datetime.now())
 
@@ -54,7 +54,7 @@ class Target(_BaseModel):
     class Meta:
         db_table = 'targets'
 
-    source_channel = ForeignKeyField(Channel, backref='targets', on_delete='CASCADE')
+    source_channel = ForeignKeyField(Channel, backref='target', on_delete='CASCADE', unique=True)
     target_channel_url = CharField(unique=True)
     channel_apostol_id = CharField(unique=True)
     platform = CharField(default='youtube')
@@ -62,5 +62,6 @@ class Target(_BaseModel):
 
 
 def register_models() -> None:
+    db.execute_sql("PRAGMA foreign_keys = ON;")
     for model in _BaseModel.__subclasses__():
         model.create_table()
