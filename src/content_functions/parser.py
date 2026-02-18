@@ -63,7 +63,7 @@ class Parser:
                 logger.warning(f"Browser returned None for {username}")
                 return []
 
-            await asyncio.sleep(10)  # Wait for 10 seconds
+            await asyncio.sleep(20)  # Wait for 20 seconds
 
             html_content = await page.evaluate('document.documentElement.outerHTML')
             if html_content is None:
