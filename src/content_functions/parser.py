@@ -34,7 +34,9 @@ class Parser:
         Excepts new videos and their source channel.
         Post videos to the target channel
         """
-        new_videos = await self._search_videos()
+        async with _parser_lock:
+            new_videos = await self._search_videos()
+            print(new_videos)
         for video in new_videos:
             source_channel = video.get('source_channel')
             video_object = video.get('new_video')
@@ -51,43 +53,42 @@ class Parser:
         """
         Returns last channel videos
         """
-        async with _parser_lock:
-            try:
-                self.browser = await uc.start(headless=True, sandbox=False)
-
-                page = await self.browser.get(f"https://www.tiktok.com/@{username}")
-                if page is None:
-                    logger.warning(f"Browser returned None for {username}")
-                    return []
-
-                await asyncio.sleep(15)  # Wait for 15 seconds
-
-                html_content = await page.evaluate('document.documentElement.outerHTML')
-                if html_content is None:
-                    logger.warning(f"Page evaluate returned None for {username}")
-                    return []
-
-                soup = BeautifulSoup(html_content, 'html.parser')
-
-                new_videos = soup.find_all('div', {'data-e2e': 'user-post-item'})[:self.MAX_LINKS_PER_CHANNEL]
-                if not new_videos:
-                    logger.info(f"Skip channel {username}: no videos scraped")
-                    return []
-
-                video_links = []
-                for video in new_videos:
-                    link_el = video.find('a')
-                    if link_el is None:
-                        continue
-                    href = link_el.get('href')
-                    if href:
-                        video_links.append(href)
-                return video_links
-            except Exception as e:
-                logger.error(f"An error occurred while scraping: {str(e)}")
+        try:
+            if not self.browser:
+                logger.error("Browser not initialized")
                 return []
-            finally:
-                await self._close_browser()
+
+            page = await self.browser.get(f"https://www.tiktok.com/@{username}")
+            if page is None:
+                logger.warning(f"Browser returned None for {username}")
+                return []
+
+            await asyncio.sleep(20)  # Wait for 20 seconds
+
+            html_content = await page.evaluate('document.documentElement.outerHTML')
+            if html_content is None:
+                logger.warning(f"Page evaluate returned None for {username}")
+                return []
+
+            soup = BeautifulSoup(html_content, 'html.parser')
+
+            new_videos = soup.find_all('div', {'data-e2e': 'user-post-item'})[:self.MAX_LINKS_PER_CHANNEL]
+            if not new_videos:
+                logger.info(f"Skip channel {username}: no videos scraped")
+                return []
+
+            video_links = []
+            for video in new_videos:
+                link_el = video.find('a')
+                if link_el is None:
+                    continue
+                href = link_el.get('href')
+                if href:
+                    video_links.append(href)
+            return video_links
+        except Exception as e:
+            logger.error(f"An error occurred while scraping: {str(e)}")
+            return []
 
     async def fetch_channel_videos(self, username: str) -> list[str]:
         """
@@ -131,6 +132,7 @@ class Parser:
         if not channels:
             logger.info('You dont have any channels')
         try:
+            self.browser = await uc.start(headless=True)
             for channel in channels:
                 new_channel_videos = await self.get_last_channel_videos(channel.name)
                 for video in new_channel_videos:
@@ -141,4 +143,6 @@ class Parser:
         except Exception:
             logger.exception("Error raised during video parsing")
             return []
+        finally:
+            await self._close_browser()
 
