@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import Union
 
 from bs4 import BeautifulSoup
-import zendriver as uc
+import nodriver as uc
 
 from config import Config
 from src.content_functions.editor import post_video_from_source_channel
@@ -13,10 +13,8 @@ from src.database.user import create_video_if_not_exist, get_all_channels, get_t
 from src.handlers.user.user import Utils
 from src.utils import logger
 
-# Только один запуск парсера одновременно — иначе несколько Chrome съедают RAM
 _parser_lock = asyncio.Lock()
 
-# Таймаут на закрытие браузера, чтобы не зависнуть на stop()
 BROWSER_STOP_TIMEOUT = 30
 
 
@@ -34,9 +32,7 @@ class Parser:
         Excepts new videos and their source channel.
         Post videos to the target channel
         """
-        async with _parser_lock:
-            new_videos = await self._search_videos()
-            print(new_videos)
+        new_videos = await self._search_videos()
         for video in new_videos:
             source_channel = video.get('source_channel')
             video_object = video.get('new_video')
@@ -53,56 +49,45 @@ class Parser:
         """
         Returns last channel videos
         """
-        try:
-            if not self.browser:
-                logger.error("Browser not initialized")
-                return []
-
-            page = await self.browser.get(f"https://www.tiktok.com/@{username}")
-            if page is None:
-                logger.warning(f"Browser returned None for {username}")
-                return []
-
-            await asyncio.sleep(20)  # Wait for 20 seconds
-
-            html_content = await page.evaluate('document.documentElement.outerHTML')
-            if html_content is None:
-                logger.warning(f"Page evaluate returned None for {username}")
-                return []
-
-            soup = BeautifulSoup(html_content, 'html.parser')
-
-            new_videos = soup.find_all('div', {'data-e2e': 'user-post-item'})[:self.MAX_LINKS_PER_CHANNEL]
-            if not new_videos:
-                logger.info(f"Skip channel {username}: no videos scraped")
-                return []
-
-            video_links = []
-            for video in new_videos:
-                link_el = video.find('a')
-                if link_el is None:
-                    continue
-                href = link_el.get('href')
-                if href:
-                    video_links.append(href)
-            return video_links
-        except Exception as e:
-            logger.error(f"An error occurred while scraping: {str(e)}")
-            return []
-
-    async def fetch_channel_videos(self, username: str) -> list[str]:
-        """
-        Starts browser, fetches last videos for one channel, closes browser.
-        """
         async with _parser_lock:
             try:
                 self.browser = await uc.start(headless=True, sandbox=False)
-                return await self.get_last_channel_videos(username)
-            except Exception as e :
-                logger.error(f"Error fetching channel videos: {e}")
+                page = await self.browser.get(f"https://www.tiktok.com/@{username}")
+                if page is None:
+                    logger.warning(f"Browser returned None for {username}")
+                    return []
+
+                await asyncio.sleep(15)
+
+                html_content = await page.evaluate('document.documentElement.outerHTML')
+                if html_content is None:
+                    logger.warning(f"Page evaluate returned None for {username}")
+                    return []
+
+                soup = BeautifulSoup(html_content, 'html.parser')
+                new_videos = soup.find_all('div', {'data-e2e': 'user-post-item'})[:self.MAX_LINKS_PER_CHANNEL]
+                if not new_videos:
+                    logger.info(f"Skip channel {username}: no videos scraped")
+                    return []
+
+                video_links = []
+                for video in new_videos:
+                    link_el = video.find('a')
+                    if link_el is None:
+                        continue
+                    href = link_el.get('href')
+                    if href:
+                        video_links.append(href)
+                return video_links
+            except Exception as e:
+                logger.error(f"An error occurred while scraping: {str(e)}")
                 return []
             finally:
                 await self._close_browser()
+
+    async def fetch_channel_videos(self, username: str) -> list[str]:
+        """Fetches last videos for one channel (browser open/close inside get_last_channel_videos)."""
+        return await self.get_last_channel_videos(username)
 
     async def _close_browser(self) -> None:
         """Guaranteed to close the browser with a timeout. Call in finally."""
@@ -115,7 +100,9 @@ class Parser:
             if getattr(browser, "connection", None) is None:
                 logger.warning("Browser connection is None, skipping stop()")
                 return
-            await asyncio.wait_for(browser.stop(), timeout=BROWSER_STOP_TIMEOUT)
+            stop_result = browser.stop()
+            if asyncio.iscoroutine(stop_result):
+                await asyncio.wait_for(stop_result, timeout=BROWSER_STOP_TIMEOUT)
             logger.info("Browser stopped successfully")
         except asyncio.TimeoutError:
             logger.error("Browser stop() timed out — process may still be running")
@@ -124,15 +111,13 @@ class Parser:
 
     async def _search_videos(self) -> list[dict[str, Union[Channel, Video]]]:
         """
-        Gets all channels from database and check do they have new videos
+        Gets all channels from database and check do they have new videos.
         """
-
         channels = get_all_channels() or []
         new_videos = []
         if not channels:
             logger.info('You dont have any channels')
         try:
-            self.browser = await uc.start(headless=True)
             for channel in channels:
                 new_channel_videos = await self.get_last_channel_videos(channel.name)
                 for video in new_channel_videos:
@@ -143,6 +128,5 @@ class Parser:
         except Exception:
             logger.exception("Error raised during video parsing")
             return []
-        finally:
-            await self._close_browser()
+
 
