@@ -3,42 +3,32 @@ from datetime import datetime
 from .models import Channel, Video, Target, User
 
 
-def get_tiktok_username(url):
+def extract_username_from_tiktok_url(url):
     username = url.split('/')[-1]
     return username.replace('@', '')
 
 
-def get_channel_by_url_or_none(channel_url: str) -> None:
-    return Channel.get_or_none(Channel.url == channel_url)
-
-
-def get_video_by_url_or_none(video_url: str) -> None:
-    return Video.get_or_none(Video.url == video_url)
-
-
 def create_channel_if_not_exist(channel_url: str) -> bool:
-    if not get_channel_by_url_or_none(channel_url):
-        channel_name = get_tiktok_username(channel_url)
-        Channel.create(url=channel_url, name=channel_name)
-        return True
-    return False
-
+    channel_name = extract_username_from_tiktok_url(channel_url)
+    channel, created = Channel.get_or_create(url=channel_url, name=channel_name)
+    return created
 
 def create_video_if_not_exist(video_url: str, channel: Channel) -> Video | None:
-    if not get_video_by_url_or_none(video_url):
-        video = Video.create(url=video_url, channel=channel)
+    video, created = Video.get_or_create(url=video_url, channel=channel)
+    if created:
         return video
     return None
 
 
 def create_target_if_not_exist(source_channel_url: str, target_channel_url: str, channel_apostol_id: str) -> Target | None:
-    source_channel = Channel.get(url=source_channel_url)
-    target = Target.get_or_none(Target.target_channel_url==target_channel_url, Target.source_channel==source_channel)
-    if not target:
-        new_target = Target.create(source_channel=source_channel,
-                      target_channel_url=target_channel_url,
-                      channel_apostol_id=channel_apostol_id)
-        return new_target
+    source_channel = Channel.get_or_none(Channel.url == source_channel_url)
+    if not source_channel:
+        return
+    target, created = Target.get_or_create(source_channel=source_channel,
+                                           target_channel_url=target_channel_url,
+                                           channel_apostol_id=channel_apostol_id)
+    if created:
+        return target
 
 
 
@@ -47,14 +37,9 @@ def get_all_channels() -> list:
 
 
 def create_user_if_not_exist(username: str, first_name: str, last_name: str, telegram_id: int) -> bool:
-    if not get_user_by_telegram_id_or_none(telegram_id):
-        User.create(username=username, first_name=first_name, last_name=last_name, telegram_id=telegram_id)
-        return True
-    return False
-
-
-def get_user_by_telegram_id_or_none(telegram_id: int) -> None:
-    return User.get_or_none(User.telegram_id == telegram_id)
+    user, created = User.get_or_create(username=username, first_name=first_name, last_name=last_name,
+                                       telegram_id=telegram_id)
+    return created
 
 
 def get_all_targets():
