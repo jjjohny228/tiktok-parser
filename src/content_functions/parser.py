@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import Union
 
 from bs4 import BeautifulSoup
-import nodriver as uc
+import zendriver as uc
 
 from config import Config
 from src.content_functions.editor import post_video_from_source_channel

@@ -91,6 +91,7 @@ class ApostolVideoUploader:
     def __post_youtube_video(self, description):
         postiz_post_url = Config.POSTIZ_POST_VIDEOS_URL
         video_title = description if len(description) > 2 else '   '
+        shortened_video_title = video_title if len(video_title) < 90 else video_title[-90:]
         data = {
             "type": "now",
             "date": "2024-12-14T10:00:00.000Z",
@@ -114,7 +115,7 @@ class ApostolVideoUploader:
                     ],
                     "settings": {
                         "__type": "youtube",
-                        "title": video_title,
+                        "title": shortened_video_title,
                         "type": "public",
                         "selfDeclaredMadeForKids": "no",
                     }
