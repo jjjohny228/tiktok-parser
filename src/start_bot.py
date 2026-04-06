@@ -22,11 +22,17 @@ async def on_startup(_):
     # Registering database models
     register_models()
 
+    parser = Parser()
+
+    # Save the current latest channel videos on startup so the first scheduled run
+    # only posts videos that appear after the bot has started.
+    await parser.sync_existing_videos()
+
     # Send database every day at 15pm
     schedule_func(Utils().send_database, trigger='cron', hour=15, minute=0)
 
     # Parse new videos every 15 minutes (one run at a time to avoid multiple Chrome instances)
-    async_schedule_func(lambda: Parser().post_new_videos(), trigger='interval', minutes=15, misfire_grace_time=90, max_instances=1)
+    async_schedule_func(parser.post_new_videos, trigger='interval', minutes=15, misfire_grace_time=90, max_instances=1)
 
     scheduler.start()
 

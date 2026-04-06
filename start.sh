@@ -1,1 +1,1 @@
-/usr/bin/xvfb-run -a python main.py
+python main.py

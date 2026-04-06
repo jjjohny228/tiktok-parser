@@ -89,6 +89,23 @@ class Parser:
         """Fetches last videos for one channel (browser open/close inside get_last_channel_videos)."""
         return await self.get_last_channel_videos(username)
 
+    async def sync_existing_videos(self) -> None:
+        """
+        Seeds the database with the current latest videos without publishing them.
+        This prevents a first scheduled run from reposting the whole current backlog.
+        """
+        channels = get_all_channels() or []
+        if not channels:
+            logger.info('Startup sync skipped: no channels configured')
+            return
+
+        logger.info('Startup sync: saving current channel videos without posting')
+        for channel in channels:
+            current_videos = await self.get_last_channel_videos(channel.name)
+            for video_url in current_videos:
+                create_video_if_not_exist(video_url, channel)
+        logger.info('Startup sync finished')
+
     async def _close_browser(self) -> None:
         """Guaranteed to close the browser with a timeout. Call in finally."""
         browser = self.browser
@@ -128,5 +145,4 @@ class Parser:
         except Exception:
             logger.exception("Error raised during video parsing")
             return []
-
 
