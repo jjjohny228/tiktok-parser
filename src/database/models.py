@@ -1,8 +1,11 @@
 import datetime
+from pathlib import Path
 
 from peewee import CharField, Model, SqliteDatabase, ForeignKeyField, DateTimeField, BigIntegerField, BooleanField
+from config import Config
 
-db = SqliteDatabase('data/TikTok.db')
+Path(Config.DATABASE_PATH).parent.mkdir(parents=True, exist_ok=True)
+db = SqliteDatabase(Config.DATABASE_PATH)
 
 
 class _BaseModel(Model):

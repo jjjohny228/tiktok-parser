@@ -1,0 +1,15 @@
+services:
+  bot:
+    build:
+      context: .
+    container_name: tiktok-parser-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_PATH: /app/data/TikTok.db
+    volumes:
+      - tiktok_parser_data:/app/data
+
+volumes:
+  tiktok_parser_data:

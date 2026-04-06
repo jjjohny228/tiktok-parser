@@ -2,3 +2,5 @@
 .git
 .gitignore
 __pycache__/
+.env
+data/TikTok.db
